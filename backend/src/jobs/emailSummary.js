@@ -18,14 +18,14 @@ async function sendDailySummary() {
       `SELECT u.id, u.email, u.name, s.business_name
        FROM users u
        JOIN settings s ON s.user_id = u.id
-       WHERE s.email_summary_enabled = true`
+       WHERE s.email_summary_enabled = 1`
     );
 
     for (const user of usersResult.rows) {
       const reviewsResult = await pool.query(
         `SELECT reviewer_name, rating, review_text, ai_response, created_at
          FROM reviews
-         WHERE user_id = $1 AND created_at > NOW() - INTERVAL '24 hours'
+         WHERE user_id = $1 AND created_at > datetime('now', '-24 hours')
          ORDER BY created_at DESC`,
         [user.id]
       );
@@ -71,7 +71,7 @@ async function sendDailySummary() {
           ${reviewHtml}
           <div style="text-align:center;margin-top:24px;">
             <a href="${process.env.FRONTEND_URL}/dashboard" style="background:#4f46e5;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">
-              View & Respond on ReviewPilot →
+              View &amp; Respond on ReviewPilot →
             </a>
           </div>
           <p style="color:#9ca3af;font-size:12px;text-align:center;margin-top:24px;">
@@ -97,7 +97,6 @@ async function sendDailySummary() {
 }
 
 function startEmailSummaryJob() {
-  // Run every hour, check user's preferred time
   cron.schedule('0 * * * *', sendDailySummary);
   console.log('Email summary job scheduled');
 }

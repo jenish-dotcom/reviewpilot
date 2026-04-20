@@ -20,12 +20,16 @@ router.get('/', auth, async (req, res) => {
       query += ` AND rating = $${params.length}`;
     }
     if (search) {
-      params.push(`%${search}%`);
-      query += ` AND (reviewer_name ILIKE $${params.length} OR review_text ILIKE $${params.length})`;
+      const searchPattern = `%${search}%`;
+      params.push(searchPattern);
+      const nameIdx = params.length;
+      params.push(searchPattern);
+      const textIdx = params.length;
+      query += ` AND (reviewer_name LIKE $${nameIdx} OR review_text LIKE $${textIdx})`;
     }
 
     const countResult = await pool.query(query.replace('SELECT *', 'SELECT COUNT(*)'), params);
-    const total = parseInt(countResult.rows[0].count);
+    const total = parseInt(countResult.rows[0]['COUNT(*)'] || countResult.rows[0].count || 0);
 
     params.push(parseInt(limit));
     params.push(parseInt(offset));
@@ -114,7 +118,7 @@ router.put('/:id', auth, async (req, res) => {
       updates.push(`edited_response = $${params.length}`);
     }
     if (responded) {
-      updates.push('responded_at = NOW()');
+      updates.push("responded_at = datetime('now')");
     }
 
     if (updates.length === 0) {

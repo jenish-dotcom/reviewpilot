@@ -9,10 +9,13 @@ router.get('/', auth, async (req, res) => {
     const userId = req.userId;
 
     const [totalResult, avgRatingResult, responseRateResult, ratingDistResult, trendResult] = await Promise.all([
-      pool.query('SELECT COUNT(*) FROM reviews WHERE user_id = $1', [userId]),
-      pool.query('SELECT ROUND(AVG(rating)::numeric, 1) as avg FROM reviews WHERE user_id = $1', [userId]),
+      pool.query('SELECT COUNT(*) as count FROM reviews WHERE user_id = $1', [userId]),
+      pool.query('SELECT ROUND(AVG(rating), 1) as avg FROM reviews WHERE user_id = $1', [userId]),
       pool.query(
-        'SELECT COUNT(*) FILTER (WHERE responded_at IS NOT NULL) as responded, COUNT(*) as total FROM reviews WHERE user_id = $1',
+        `SELECT
+           SUM(CASE WHEN responded_at IS NOT NULL THEN 1 ELSE 0 END) as responded,
+           COUNT(*) as total
+         FROM reviews WHERE user_id = $1`,
         [userId]
       ),
       pool.query(
@@ -20,8 +23,8 @@ router.get('/', auth, async (req, res) => {
         [userId]
       ),
       pool.query(
-        `SELECT DATE_TRUNC('week', created_at) as week, COUNT(*) as count, ROUND(AVG(rating)::numeric, 1) as avg_rating
-         FROM reviews WHERE user_id = $1 AND created_at > NOW() - INTERVAL '12 weeks'
+        `SELECT strftime('%Y-%W', created_at) as week, COUNT(*) as count, ROUND(AVG(rating), 1) as avg_rating
+         FROM reviews WHERE user_id = $1 AND created_at > datetime('now', '-84 days')
          GROUP BY week ORDER BY week ASC`,
         [userId]
       ),
@@ -29,8 +32,8 @@ router.get('/', auth, async (req, res) => {
 
     const responseRate = responseRateResult.rows[0];
     const totalReviews = parseInt(totalResult.rows[0].count);
-    const responded = parseInt(responseRate.responded);
-    const total = parseInt(responseRate.total);
+    const responded = parseInt(responseRate.responded || 0);
+    const total = parseInt(responseRate.total || 0);
 
     res.json({
       totalReviews,
